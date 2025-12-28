@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ashik OCR Tool</title>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.js"></script>
+
+<style>
+body{margin:0;font-family:monospace;background:#050505;color:#00ffcc;}
+h1{text-align:center;color:#00ff00;margin-bottom:4px;font-size:20px;}
+h2{text-align:center;color:#00ffcc;margin-bottom:10px;font-size:14px;}
+.container{padding:10px;position:relative;}
+button{width:100%;padding:10px;margin:6px 0;background:black;color:#00ff00;border:2px solid #00ff00;cursor:pointer;}
+button:hover{background:#00ff00;color:black;}
+#output{margin-top:10px;border:1px solid #00ffcc;padding:8px;min-height:120px;white-space:pre-wrap;user-select:text;}
+
+/* Three-dot menu */
+.menu{position:absolute;top:10px;right:10px;font-size:25px;cursor:pointer;}
+.menu-items{display:none;position:absolute;top:35px;right:10px;background:black;border:1px solid #00ffcc;padding:5px;width:160px;z-index:10;}
+.menu-items button{width:100%;text-align:left;margin:0;padding:8px;}
+
+/* MODALS */
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);justify-content:center;align-items:center;z-index:1000;}
+.modal-content{background:#000;border:2px solid #00ffcc;padding:10px;max-width:90%;max-height:80%;overflow:auto;text-align:center;}
+#cropImage{max-width:100%;max-height:300px;object-fit:contain;}
+#profilePic{width:80px;height:80px;border-radius:50%;border:2px solid #00ffcc;margin-bottom:5px;object-fit:cover;}
+</style>
+</head>
+<body>
+
+<div class="container">
+<h1>Ashik OCR Tool</h1>
+<h2>Image to Text Converter</h2>
+
+<!-- Three-dot menu -->
+<div class="menu" id="menuBtn">⋮</div>
+<div class="menu-items" id="menuItems">
+  <button id="registerBtn" onclick="openRegister()">Register</button>
+  <button id="profileBtn" onclick="openProfile()" style="display:none;">Profile</button>
+</div>
+
+<!-- Registration Modal -->
+<div id="registerModal" class="modal">
+  <div class="modal-content">
+    <h3>Register</h3>
+    <input type="text" id="regName" placeholder="Name" style="width:90%;margin:5px 0;padding:5px;"><br>
+    <input type="password" id="regPass" placeholder="Password" style="width:90%;margin:5px 0;padding:5px;"><br>
+    <input type="file" id="regPic" accept="image/*" style="margin:5px 0;"><br>
+    <button onclick="registerUser()">Register</button>
+    <button onclick="closeRegister()">Cancel</button>
+  </div>
+</div>
+
+<!-- Profile modal -->
+<div id="profileModal" class="modal">
+  <div class="modal-content">
+    <img id="profilePic" src="https://via.placeholder.com/80">
+    <h3 id="profileName"></h3>
+    <button onclick="closeProfile()">Close</button>
+  </div>
+</div>
+
+<!-- Image upload + OCR -->
+<input type="file" id="imageInput" accept="image/*" style="display:none;">
+<div id="output">Waiting...</div>
+<button onclick="copyText()">Copy Text</button>
+
+<!-- Crop Modal -->
+<div id="cropModal" class="modal">
+  <div class="modal-content">
+    <h3>Crop Your Image</h3>
+    <img id="cropImage">
+    <button id="cropBtn">Crop</button>
+    <button onclick="closeCrop()">Cancel</button>
+  </div>
+</div>
+
+<!-- Convert Modal -->
+<div id="convertModal" class="modal">
+  <div class="modal-content">
+    <h3>Convert Image → Text</h3>
+    <button id="convertBtn">Convert</button>
+    <button onclick="closeConvert()">Cancel</button>
+  </div>
+</div>
+
+<script>
+let cropper;
+let croppedBlob;
+let currentUser=null;
+
+// Menu toggle
+const menuBtn=document.getElementById("menuBtn");
+const menuItems=document.getElementById("menuItems");
+menuBtn.addEventListener("click",()=>{menuItems.style.display=(menuItems.style.display==='block'?'none':'block');});
+
+// Registration
+function openRegister(){document.getElementById("registerModal").style.display="flex";menuItems.style.display="none";}
+function closeRegister(){document.getElementById("registerModal").style.display="none";}
+
+function registerUser(){
+  const name=document.getElementById("regName").value.trim();
+  const pass=document.getElementById("regPass").value.trim();
+  const picInput=document.getElementById("regPic");
+  if(!name||!pass){alert("Fill all fields"); return;}
+  if(picInput.files.length===0){alert("Upload profile pic"); return;}
+  
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const picData=e.target.result;
+    localStorage.setItem("userName",name);
+    localStorage.setItem("userPass",pass);
+    localStorage.setItem("userPic",picData);
+    currentUser={name:name,pic:picData};
+    alert("Account Created Successfully!");
+    document.getElementById("registerBtn").style.display="none";
+    document.getElementById("profileBtn").style.display="block";
+    closeRegister();
+    document.getElementById("imageInput").style.display="block";
+  };
+  reader.readAsDataURL(picInput.files[0]);
+}
+
+// Profile
+const profileModal=document.getElementById("profileModal");
+const profilePic=document.getElementById("profilePic");
+const profileName=document.getElementById("profileName");
+
+function openProfile(){
+  if(!currentUser){
+    const name=localStorage.getItem("userName");
+    const pic=localStorage.getItem("userPic");
+    if(name && pic){currentUser={name:name,pic:pic};}
+    else return alert("No user found!");
+  }
+  profilePic.src=currentUser.pic;
+  profileName.innerText=currentUser.name;
+  profileModal.style.display="flex";
+}
+function closeProfile(){profileModal.style.display="none";}
+
+// OCR Image Upload + Crop + Convert
+const cropModal=document.getElementById("cropModal");
+const convertModal=document.getElementById("convertModal");
+const cropImg=document.getElementById("cropImage");
+const imageInput=document.getElementById("imageInput");
+const output=document.getElementById("output");
+
+imageInput.addEventListener("change",function(e){
+  const file=e.target.files[0]; if(!file) return;
+  cropImg.src=URL.createObjectURL(file);
+  cropModal.style.display="flex";
+  if(cropper) cropper.destroy();
+  cropper=new Cropper(cropImg,{viewMode:1,autoCropArea:0.5,zoomable:false,background:false,responsive:true});
+});
+
+// Crop
+document.getElementById("cropBtn").addEventListener("click",function(){
+  const cropData=cropper.getData();
+  if(cropData.width<10 || cropData.height<10){alert("Define crop box!"); return;}
+  cropper.getCroppedCanvas().toBlob(blob=>{
+    croppedBlob=blob; cropper.destroy(); cropper=null;
+    cropModal.style.display="none"; convertModal.style.display="flex";
+  });
+});
+function closeCrop(){if(cropper){cropper.destroy(); cropper=null;}cropModal.style.display="none"; convertModal.style.display="flex";}
+
+// Convert
+document.getElementById("convertBtn").addEventListener("click",function(){
+  convertModal.style.display="none";
+  let blobToUse=croppedBlob;
+  if(!blobToUse){const tempImg=cropImg; const canvas=document.createElement("canvas");canvas.width=tempImg.naturalWidth; canvas.height=tempImg.naturalHeight; canvas.getContext("2d").drawImage(tempImg,0,0); blobToUse=dataURLtoBlob(canvas.toDataURL());}
+  output.innerText="Processing OCR...";
+  Tesseract.recognize(blobToUse,'ben+eng').then(({data:{text}})=>{output.innerText=text||"No text found!";});
+});
+function closeConvert(){convertModal.style.display="none";}
+
+// Copy
+function copyText(){navigator.clipboard.writeText(output.innerText);alert("Copied!");}
+
+// Helper
+function dataURLtoBlob(dataurl){let arr=dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr=atob(arr[1]), n=bstr.length, u8arr=new Uint8Array(n); while(n--){u8arr[n]=bstr.charCodeAt(n);} return new Blob([u8arr],{type:mime});}
+
+</script>
+
+</body>
+</html>
